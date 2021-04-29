@@ -1,0 +1,35 @@
+title = "Desired Firefox Extensions"
+
+[extensions]
+# get around news paywalls
+bypass-paywalls = "bypass-paywalls-firefox"
+# remove sidebar and "nextprev" elements
+RES = "reddit-enhancement-suite"
+# auto redirect to old reddit
+old-reddit-redirect = "old-reddit-redirect"
+# limit time spent on distracting sites
+limit = "limit-limit-distracting-sites"
+# eliminate feed, autoplay, sidebar
+distraction-free-youtube = "df-youtube"
+# automatically skip past sponsors
+sponsorblock = "sponsorblock"
+# limit number of posts showing up on twitter
+twitter-without-infinite-scroll = "t-w-i-s"
+# make twitter more user friendly
+minimal-twitter = "min-twitter"
+# pretty new tab page
+tabliss = "tabliss"
+# make sites go dark mode automatically
+darkreader = "darkreader"
+# allow automatic blocking of some sites
+leechblock-ng = "leechblock-ng"
+# strip tracking elements off of urls
+link-cleaner = "link-cleaner"
+# block ads
+ublock-origin = "ublock-origin"
+# get around academic paywalls
+unpaywall = "unpaywall"
+# tab heirarchy with trees
+tree-style-tab = "tree-style-tab"
+# segment online life into containers
+multi-account-containers = "multi-account-containers"
