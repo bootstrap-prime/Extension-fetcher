@@ -1,0 +1,18 @@
+hash maps
+https://doc.rust-lang.org/std/collections/struct.HashMap.html
+https://doc.rust-lang.org/std/collections/struct.HashMap.html
+
+web api
+https://rust-lang-nursery.github.io/rust-cookbook/web/clients/apis.html
+https://dev.to/hb/how-to-fetch-a-web-api-with-rust-1390
+https://docs.rs/reqwest/0.11.3/reqwest/
+https://docs.rs/reqwest/0.11.3/reqwest/struct.Response.html#method.text
+
+deserializing
+https://serde.rs/
+https://github.com/serde-rs/json
+
+building deserializers
+https://transform.tools/json-to-rust-serde
+https://juliano-alves.com/2020/01/06/rust-deserialize-json-with-serde/
+https://serde.rs/attr-flatten.html
