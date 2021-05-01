@@ -9,7 +9,8 @@ pub struct Extensions {
     extensions: HashMap<String, String>,
 }
 
-fn main() -> anyhow::Result<()> {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     let filename = env::args().nth(1).unwrap_or(DEFAULT_FILENAME.to_string());
 
     let file_contents = fs::read_to_string(filename)?;
@@ -18,7 +19,7 @@ fn main() -> anyhow::Result<()> {
 
     let datavector = toml_data_to_struct(&toml_ext_data.extensions);
 
-    let responses = get_mozilla_api_responses(datavector)?;
+    let responses = get_mozilla_api_responses(datavector).await?;
 
     let mut outfile = fs::File::create("sources.nix")?;
 
@@ -43,13 +44,14 @@ fn construct_file(extensions: Vec<ExtensionData>) -> String {
         })
         .collect::<Vec<String>>().join("\n");
 
-    format!("pkgs: [\n{}\n]", addon_constructed.to_string())
+    format!("pkgs: [\n{}\n]\n", addon_constructed.to_string())
 }
 
 // types for turning hashmap into TomlLists
 pub struct TomlList {
     human_name: String,
-    api_slug: String,
+    // api_slug: String,
+    api_url: String,
 }
 
 pub struct ExtensionData {
@@ -60,18 +62,17 @@ pub struct ExtensionData {
 
 fn toml_data_to_struct(tomldata: &HashMap<String, String>) -> Vec<TomlList> {
     let mut structured_data: Vec<TomlList> = Vec::with_capacity(tomldata.len());
+    let api = "https://addons.mozilla.org/api/v4/addons/addon";
+
     for (key, value) in tomldata {
         structured_data.push(TomlList {
             human_name: key.to_string(),
-            api_slug: value.to_string(),
+            // api_slug: value.to_string(),
+            api_url: format!("{}/{}/", api, value).to_string(),
         });
     }
 
     return structured_data;
-}
-
-fn get_mozilla_api_up() {
-    // check to see if site is functional
 }
 
 // serde things for deserializing api response for values we care about
@@ -95,20 +96,14 @@ pub struct File {
     pub url: String,
 }
 
-fn get_mozilla_api_responses(exts: Vec<TomlList>) -> Result<Vec<ExtensionData>, reqwest::Error> {
-    let api = "https://addons.mozilla.org/api/v4/addons/addon";
-    let client = reqwest::blocking::Client::new();
+async fn get_mozilla_api_responses(exts: Vec<TomlList>) -> Result<Vec<ExtensionData>, reqwest::Error> {
+    let client = reqwest::Client::new();
     let mut gathered_extensions: Vec<ExtensionData> = Vec::with_capacity(exts.len());
-
-    // check to see if site is functional
-    // addons.mozilla.org/api/v4/site (check)
-    get_mozilla_api_up();
 
     for element in exts.iter() {
         let client = &client;
-        let request_url: String = format!("{}/{}/", api, element.api_slug);
 
-        let resp = client.get(request_url).send()?.json::<Root>()?;
+        let resp = client.get(&element.api_url).send().await?.json::<Root>().await?;
 
         gathered_extensions.push(ExtensionData {
             name: element.human_name.to_string(),
