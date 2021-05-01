@@ -1,6 +1,6 @@
-use serde::{Serialize, Deserialize};
-use std::{collections::HashMap, env};
+use serde::{Deserialize, Serialize};
 use std::fs;
+use std::{collections::HashMap, env};
 
 static DEFAULT_FILENAME: &'static str = "./extensions.toml";
 
@@ -9,30 +9,10 @@ pub struct Extensions {
     extensions: HashMap<String, String>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, serde_derive::Serialize, serde_derive::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Root {
-    #[serde(rename = "current_version")]
-    pub current_version: CurrentVersion,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, serde_derive::Serialize, serde_derive::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CurrentVersion {
-    pub files: Vec<File>,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, serde_derive::Serialize, serde_derive::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct File {
-    pub hash: String,
-    pub url: String,
-}
-
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-    let filename:&str;
+    let filename: &str;
     if args.len() >= 2 {
         filename = &args[1];
     } else {
@@ -40,18 +20,16 @@ fn main() {
     }
 
     let file_contents = match fs::read_to_string(filename) {
-        Ok(contents) => {
-            contents
-        }
+        Ok(contents) => contents,
         Err(e) => {
             println!("{}", e);
             std::process::exit(-1);
         }
     };
 
-    let tomltable: Extensions = toml::from_str(&file_contents).unwrap();
+    let toml_ext_data: Extensions = toml::from_str(&file_contents).unwrap();
 
-    get_firefox_url(&tomltable);
+    //get_firefox_url(&tomltable);
 }
 
 async fn get_firefox_url(exts: &Extensions) {
@@ -79,4 +57,55 @@ async fn get_firefox_url(exts: &Extensions) {
     for(name, xtname) in &nix_collected {
         println!("{}: \"{}\"", name, xtname);
     }
+}
+
+// serde things for deserializing api response for values we care about
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Root {
+    #[serde(rename = "current_version")]
+    //#[serde(flatten)]
+    pub current_version: CurrentVersion,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CurrentVersion {
+    pub files: Vec<File>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct File {
+    pub hash: String,
+    pub url: String,
+}
+
+// name comes from deserialized toml, api_response comes from mozilla addon api
+fn parse_mozilla_api_response(api_response: &str, name: &str) -> HashMap<String, String> {
+    let mut extension_data = HashMap::new();
+    extension_data.insert("name".to_string(), name.to_string());
+
+    let parsed_response: Root = match serde_json::from_str(api_response) {
+        Ok(value) => value,
+        Err(e) => {
+            println!("{}", e);
+            std::process::exit(-1);
+        }
+    };
+
+    extension_data.insert(
+        "url".to_string(),
+        parsed_response.current_version.files[0].url.to_string(),
+    );
+    extension_data.insert(
+        "hash".to_string(),
+        parsed_response.current_version.files[0].hash.to_string(),
+    );
+
+    for (key, value) in &extension_data {
+        println!("{} = {}", key, value);
+    }
+
+    return extension_data;
 }
