@@ -1,3 +1,4 @@
+use futures::TryFutureExt;
 use serde::Deserialize;
 use std::fs;
 use std::{collections::HashMap, env};
@@ -42,7 +43,8 @@ fn construct_file(extensions: Vec<ExtensionData>) -> String {
                 extension.name, extension.url, extension.hash
             )
         })
-        .collect::<Vec<String>>().join("\n");
+        .collect::<Vec<String>>()
+        .join("\n");
 
     format!("pkgs: [\n{}\n]\n", addon_constructed.to_string())
 }
@@ -96,22 +98,26 @@ pub struct File {
     pub url: String,
 }
 
-async fn get_mozilla_api_responses(exts: Vec<TomlList>) -> Result<Vec<ExtensionData>, reqwest::Error> {
+async fn get_mozilla_api_responses(
+    exts: Vec<TomlList>,
+) -> Result<Vec<ExtensionData>, reqwest::Error> {
     let client = reqwest::Client::new();
-    let mut gathered_extensions: Vec<ExtensionData> = Vec::with_capacity(exts.len());
+    let client = &client;
 
-    for element in exts.iter() {
-        let client = &client;
-
-        let resp = client.get(&element.api_url).send().await?.json::<Root>().await?;
-
-        gathered_extensions.push(ExtensionData {
-            name: element.human_name.to_string(),
-            url: resp.current_version.files[0].url.to_string(),
-            // slice off "sha256:" from hash string
-            hash: resp.current_version.files[0].hash[7..].to_string(),
-        });
-    }
-
-    return Ok(gathered_extensions);
+    futures::future::join_all(exts.into_iter().map(|el| {
+        client
+            .get(el.api_url.clone())
+            .send()
+            .and_then(|r| r.json::<Root>())
+            .and_then(|r| async move {
+                Ok(ExtensionData {
+                    name: el.human_name.to_string(),
+                    url: r.current_version.files[0].url.to_string(),
+                    hash: r.current_version.files[0].hash[7..].to_string(),
+                })
+            })
+    }))
+    .await
+    .into_iter()
+    .collect()
 }
