@@ -9,6 +9,17 @@ pub struct Extensions {
     extensions: HashMap<String, String>,
 }
 
+pub struct TomlList {
+    human_name: String,
+    api_slug: String,
+}
+
+pub struct ExtensionData {
+    name: String,
+    url: String,
+    hash: String,
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
 
@@ -27,36 +38,50 @@ fn main() {
         }
     };
 
-    let toml_ext_data: Extensions = toml::from_str(&file_contents).unwrap();
+    let toml_ext_data: Extensions = match toml::from_str(&file_contents) {
+        Ok(data) => data,
+        Err(e) => {
+            println!("{}", e);
+            std::process::exit(-1);
+        }
+    };
+    // let toml_ext_data = toml_ext_data.extensions;
+
+    let responses = match get_mozilla_api_responses(toml_ext_data.extensions) {
+        Ok(data) => data,
+        Err(e) => {
+            println!("{}", e);
+            std::process::exit(-1);
+        },
+    };
+
+    for element in responses {
+        println!("(pkgs.fetchFirefoxAddon {{");
+        println!("  name = \"{}\";          ", element.name);
+        println!("  url = \"{}\";           ", element.url);
+        println!("  sha256 = \"{}\";        ", element.hash);
+        println!("}})                       ");
+    }
 
     //get_firefox_url(&tomltable);
 }
 
-async fn get_firefox_url(exts: &Extensions) {
-    let mut nix_collected = HashMap::new();
-
-    let api = "https://addons.mozilla.org/api/v4/addons/addon";
-
-    let client = reqwest::Client::new();
-
-    // check to see if site is functional
-    // addons.mozilla.org/api/v4/site (check)
-
-    exts.extensions.values().for_each(|xtension| {
-        nix_collected.insert("name", xtension);
-        let request_url_base = format!("{}/{}/", api, xtension);
-
-        // parse api response from slug
-        let unparsed_response = reqwest::get(request_url).await?.text();
-        let parsed_response = serde_json::from_str(&unparsed_response).unwrap();
-
-        //let content = parsed_response.
-
-    });
-
-    for(name, xtname) in &nix_collected {
-        println!("{}: \"{}\"", name, xtname);
+fn toml_data_to_struct(tomldata: HashMap<String, String>) -> Vec<TomlList> {
+    let mut structured_data: Vec<TomlList> = Vec::with_capacity(tomldata.len());
+    for (key, value) in tomldata {
+        structured_data.push(
+            TomlList {
+                human_name: key.to_string(),
+                api_slug: value.to_string(),
+            }
+        );
     }
+
+    return structured_data;
+}
+
+fn get_mozilla_api_up() {
+    // check to see if site is functional
 }
 
 // serde things for deserializing api response for values we care about
@@ -81,31 +106,27 @@ pub struct File {
     pub url: String,
 }
 
-// name comes from deserialized toml, api_response comes from mozilla addon api
-fn parse_mozilla_api_response(api_response: &str, name: &str) -> HashMap<String, String> {
-    let mut extension_data = HashMap::new();
-    extension_data.insert("name".to_string(), name.to_string());
+fn get_mozilla_api_responses(exts: HashMap<String, String> ) -> Result<Vec<ExtensionData>, reqwest::Error> {
+    let api = "https://addons.mozilla.org/api/v4/addons/addon";
+    let client = reqwest::blocking::Client::new();
+    let mut gathered_extensions: Vec<ExtensionData> = Vec::with_capacity(exts.len());
 
-    let parsed_response: Root = match serde_json::from_str(api_response) {
-        Ok(value) => value,
-        Err(e) => {
-            println!("{}", e);
-            std::process::exit(-1);
-        }
-    };
+    // check to see if site is functional
+    // addons.mozilla.org/api/v4/site (check)
+    get_mozilla_api_up();
 
-    extension_data.insert(
-        "url".to_string(),
-        parsed_response.current_version.files[0].url.to_string(),
-    );
-    extension_data.insert(
-        "hash".to_string(),
-        parsed_response.current_version.files[0].hash.to_string(),
-    );
+    for (human_name, api_slug) in exts.iter() {
+        let client = &client;
+        let request_url: String = format!("{}/{}/", api, api_slug);
 
-    for (key, value) in &extension_data {
-        println!("{} = {}", key, value);
+        let resp = client.get(request_url).send()?.json::<Root>()?;
+
+        gathered_extensions.push(ExtensionData {
+            name: human_name.to_string(),
+            url: resp.current_version.files[0].url.to_string(),
+            hash: resp.current_version.files[0].hash.to_string(),
+        });
     }
 
-    return extension_data;
+    return Ok(gathered_extensions);
 }
